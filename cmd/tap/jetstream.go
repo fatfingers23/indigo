@@ -436,7 +436,7 @@ func (jp *JetstreamProcessor) runConsumer(ctx context.Context) error {
 			continue
 		}
 
-		jp.logger.Info("connected to firehose")
+		jp.logger.Info("connected to jetstream")
 		retries = 0
 
 		// TODO
