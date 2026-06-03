@@ -71,7 +71,7 @@ func (fp *JetstreamProcessor) Run(ctx context.Context) error {
 
 // ProcessCommit  applies a commit event from the Jetstream.
 func (jp *JetstreamProcessor) ProcessCommit(ctx context.Context, evt *jetstream.JetstreamEvent) error {
-	firehoseEventsReceived.Inc()
+	jetstreamEventsReceived.Inc()
 
 	ctx, span := jetstreamTracer.Start(ctx, "ProcessCommit")
 	defer span.End()
@@ -91,24 +91,24 @@ func (jp *JetstreamProcessor) ProcessCommit(ctx context.Context, evt *jetstream.
 			}
 		}
 		// even if we just tracked, we return here and just let the resync workers handle the rest
-		firehoseEventsSkipped.Inc()
+		jetstreamEventsSkipped.Inc()
 		return nil
 	}
 
 	if curr.State != models.RepoStateActive && curr.State != models.RepoStateResyncing {
-		firehoseEventsSkipped.Inc()
+		jetstreamEventsSkipped.Inc()
 		return nil
 	}
 
 	//TODO this gets hit way more than I'd expect
 	if curr.Rev != "" && evt.Commit.Rev <= curr.Rev {
 		jp.logger.Debug("skipping replayed event", "did", evt.Did, "eventRev", evt.Commit.Rev, "currentRev", curr.Rev)
-		firehoseEventsSkipped.Inc()
+		jetstreamEventsSkipped.Inc()
 		return nil
 	}
 
 	if !matchesCollection(evt.Commit.Collection, jp.collectionFilters) {
-		firehoseEventsSkipped.Inc()
+		jetstreamEventsSkipped.Inc()
 		return nil
 	}
 
@@ -127,7 +127,7 @@ func (jp *JetstreamProcessor) ProcessCommit(ctx context.Context, evt *jetstream.
 		},
 	}
 	if curr.State == models.RepoStateResyncing {
-		firehoseEventsSkipped.Inc()
+		jetstreamEventsSkipped.Inc()
 		return jp.events.addToResyncBuffer(ctx, commit)
 	}
 
@@ -151,13 +151,13 @@ func (jp *JetstreamProcessor) ProcessCommit(ctx context.Context, evt *jetstream.
 		return err
 	}
 
-	firehoseEventsProcessed.Inc()
+	jetstreamEventsProcessed.Inc()
 	return nil
 }
 
 // ProcessSync handles sync events and marks repos for resync if needed.
 func (jp *JetstreamProcessor) ProcessSync(ctx context.Context, evt *jetstream.JetstreamEvent) error {
-	firehoseEventsReceived.Inc()
+	jetstreamEventsReceived.Inc()
 
 	ctx, span := jetstreamTracer.Start(ctx, "ProcessSync")
 	defer span.End()
@@ -173,21 +173,21 @@ func (jp *JetstreamProcessor) ProcessSync(ctx context.Context, evt *jetstream.Je
 				jp.logger.Error("failed to auto-track repo", "did", evt.Did, "error", err)
 				return err
 			}
-			firehoseEventsSkipped.Inc()
+			jetstreamEventsSkipped.Inc()
 			return nil
 		}
-		firehoseEventsSkipped.Inc()
+		jetstreamEventsSkipped.Inc()
 		return nil
 	}
 
 	if curr.State != models.RepoStateActive {
-		firehoseEventsSkipped.Inc()
+		jetstreamEventsSkipped.Inc()
 		return nil
 	}
 
 	if curr.Rev != "" && evt.Sync.Rev <= curr.Rev {
 		jp.logger.Debug("skipping replayed event", "did", evt.Did, "eventRev", evt.Sync.Rev, "currentRev", curr.Rev)
-		firehoseEventsSkipped.Inc()
+		jetstreamEventsSkipped.Inc()
 		return nil
 	}
 
@@ -197,12 +197,12 @@ func (jp *JetstreamProcessor) ProcessSync(ctx context.Context, evt *jetstream.Je
 		return err
 	}
 
-	firehoseEventsProcessed.Inc()
+	jetstreamEventsProcessed.Inc()
 	return nil
 }
 
 func (jp *JetstreamProcessor) ProcessIdentity(ctx context.Context, evt *jetstream.JetstreamEvent) error {
-	firehoseEventsReceived.Inc()
+	jetstreamEventsReceived.Inc()
 	defer jp.updateLastSeq(evt.TimeUS)
 
 	curr, err := jp.repos.GetRepoState(ctx, evt.Did)
@@ -213,10 +213,10 @@ func (jp *JetstreamProcessor) ProcessIdentity(ctx context.Context, evt *jetstrea
 			if err := jp.repos.EnsureRepo(ctx, evt.Did); err != nil {
 				return err
 			}
-			firehoseEventsSkipped.Inc()
+			jetstreamEventsSkipped.Inc()
 			return nil
 		}
-		firehoseEventsSkipped.Inc()
+		jetstreamEventsSkipped.Inc()
 		return nil
 	}
 
@@ -224,12 +224,12 @@ func (jp *JetstreamProcessor) ProcessIdentity(ctx context.Context, evt *jetstrea
 		return err
 	}
 
-	firehoseEventsProcessed.Inc()
+	jetstreamEventsProcessed.Inc()
 	return nil
 }
 
 func (jp *JetstreamProcessor) ProcessAccount(ctx context.Context, evt *jetstream.JetstreamEvent) error {
-	firehoseEventsReceived.Inc()
+	jetstreamEventsReceived.Inc()
 	defer jp.updateLastSeq(evt.TimeUS)
 
 	curr, err := jp.repos.GetRepoState(ctx, evt.Did)
@@ -241,10 +241,10 @@ func (jp *JetstreamProcessor) ProcessAccount(ctx context.Context, evt *jetstream
 				jp.logger.Error("failed to auto-track repo", "did", evt.Did, "error", err)
 				return err
 			}
-			firehoseEventsSkipped.Inc()
+			jetstreamEventsSkipped.Inc()
 			return nil
 		}
-		firehoseEventsSkipped.Inc()
+		jetstreamEventsSkipped.Inc()
 		return nil
 	}
 
@@ -255,12 +255,12 @@ func (jp *JetstreamProcessor) ProcessAccount(ctx context.Context, evt *jetstream
 		updateTo = models.AccountStatus(*evt.Account.Status)
 	} else {
 		// no-op for other events such as throttled or desynchronized
-		firehoseEventsSkipped.Inc()
+		jetstreamEventsSkipped.Inc()
 		return nil
 	}
 
 	if curr.Status == updateTo {
-		firehoseEventsSkipped.Inc()
+		jetstreamEventsSkipped.Inc()
 		return nil
 	}
 
@@ -289,7 +289,7 @@ func (jp *JetstreamProcessor) ProcessAccount(ctx context.Context, evt *jetstream
 		}
 	}
 
-	firehoseEventsProcessed.Inc()
+	jetstreamEventsProcessed.Inc()
 	return nil
 }
 
