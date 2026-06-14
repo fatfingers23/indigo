@@ -13,6 +13,7 @@ import (
 	"github.com/bluesky-social/indigo/atproto/atdata"
 	"github.com/bluesky-social/indigo/atproto/repo"
 	"github.com/bluesky-social/indigo/atproto/syntax"
+	"github.com/bluesky-social/indigo/cmd/tap/links"
 	"github.com/bluesky-social/indigo/cmd/tap/models"
 	"github.com/bluesky-social/indigo/events"
 	"github.com/bluesky-social/indigo/events/schedulers/parallel"
@@ -184,7 +185,10 @@ func (fp *FirehoseProcessor) validateCommitAndFilterOps(ctx context.Context, evt
 			parsed.Record = record
 		}
 
-		if matchesCollection(parsed.Collection, fp.collectionFilters) {
+		// Only forward records that contain backlinks (matching constellation's
+		// get_actionable): creates are kept only if they have links, updates and
+		// deletes are always kept.
+		if links.IsActionable(parsed.Action, parsed.Rkey, parsed.Record) {
 			parsedOps = append(parsedOps, parsed)
 		}
 	}

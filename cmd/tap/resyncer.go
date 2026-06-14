@@ -15,6 +15,7 @@ import (
 	"github.com/bluesky-social/indigo/atproto/atdata"
 	repolib "github.com/bluesky-social/indigo/atproto/repo"
 	"github.com/bluesky-social/indigo/atproto/syntax"
+	"github.com/bluesky-social/indigo/cmd/tap/links"
 	"github.com/bluesky-social/indigo/cmd/tap/models"
 	"github.com/ipfs/go-cid"
 	"go.opentelemetry.io/otel/attribute"
@@ -266,11 +267,6 @@ func (r *Resyncer) doResync(ctx context.Context, did string) (bool, error) {
 		rkeyStr := rkey.String()
 		cidStr := recCid.String()
 
-		// Filter collections - only process if matches filters
-		if !matchesCollection(collStr, r.collectionFilters) {
-			return nil
-		}
-
 		existingCid, exists := existingCids[recPath]
 		if exists && existingCid == cidStr {
 			return nil
@@ -292,6 +288,13 @@ func (r *Resyncer) doResync(ctx context.Context, did string) (bool, error) {
 			// do not fail here
 			// we end up storing the CID but not passing the record along in the outbox
 			r.logger.Error("failed to unmarshal record", "did", did, "path", recPath, "error", err)
+		}
+
+		// Only forward records that contain backlinks (matching constellation's
+		// get_actionable). Resync only produces creates/updates: linkless creates
+		// are dropped, updates are always kept.
+		if !links.IsActionable(action, rkeyStr, rec) {
+			return nil
 		}
 
 		evt := &RecordEvt{
